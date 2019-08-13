@@ -1,0 +1,4 @@
+-e https://github.com/KOLLIKUH/rosreestr2coord.git#egg=rosreestr2coord
+numpy==1.11.2
+Pillow==3.3.1
+opencv-python==4.1.0.25
