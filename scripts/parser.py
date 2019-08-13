@@ -7,6 +7,7 @@ import json
 import string
 import urllib
 import os
+import requests
 
 from catalog import Catalog
 from export import coords2geojson
@@ -34,7 +35,9 @@ SEARCH_URL = "http://pkk5.rosreestr.ru/api/features/$area_type"
 # URL to get area metainfo #
 ############################
 # http://pkk5.rosreestr.ru/api/features/1/38:36:21:1106
-FEATURE_INFO_URL = "http://pkk5.rosreestr.ru/api/features/$area_type/"
+#FEATURE_INFO_URL = "http://pkk5.rosreestr.ru/api/features/$area_type/"
+FEATURE_INFO_URL = "https://egrp365.ru/map_alpha/ajax/map.php?source=kadid"
+
 
 #########################
 # URL to get area image #
@@ -77,18 +80,8 @@ class NoCoordinatesException(Exception):
     pass
 
 
-
-# def restore_area(restore, area_type=1, media_path="", with_log=False, catalog_path="", coord_out="EPSG:3857",
-#                  file_name="example", output=os.path.join("output"), repeat=0, areas=None, with_attrs=False, delay=1,
-#                  center_only=False, with_proxy=False):
-#     area = Area(media_path=media_path, area_type=area_type, with_log=with_log, coord_out=coord_out,
-#                             center_only=center_only, with_proxy=with_proxy)
-
-def restore_area(restore, area_type=1, media_path="", with_log=False, catalog_path="", coord_out="EPSG:3857",
-                 file_name="example", output=os.path.join("output"), repeat=0, areas=None, with_attrs=False, delay=1,
-                 center_only=False, with_proxy=False):
-    area = Area(media_path=media_path, area_type=area_type, with_log=with_log, coord_out=coord_out,
-                center_only=center_only, with_proxy=with_proxy)
+def restore_area(restore, coord_out):
+    area = Area(coord_out=coord_out)
     area.restore(restore)
     return area
 
@@ -119,13 +112,12 @@ class Area:
         self.code_id = ""
         self.file_name = self.code[:].replace(":", "_")
         self.with_proxy = with_proxy
-
         self.coord_out = coord_out
 
         t = string.Template(SEARCH_URL)
         self.search_url = t.substitute({"area_type": area_type})
         t = string.Template(FEATURE_INFO_URL)
-        self.feature_info_url = t.substitute({"area_type": area_type})
+        self.feature_info_url = t #t.substitute({"area_type": area_type})
         
         if not self.media_path:
             # self.media_path = os.path.dirname(os.path.realpath(__file__))
@@ -224,12 +216,20 @@ class Area:
         response = make_request(url, self.with_proxy)
         return response
 
+    def make_request_for_feature(self, url, id):
+        url = url.encode('utf-8')
+        print(url)
+        print(id)
+        r = requests.post(url, data={'type': self.area_type, 'kadid': id})
+        return r.text
+
 
     def download_feature_info(self):
         try:
-            search_url = self.feature_info_url + self.clear_code(self.code)
+            
+            search_url = FEATURE_INFO_URL # + self.clear_code(self.code)
             self.log("Start downloading area info: %s" % search_url)
-            response = self.make_request(search_url)
+            response = self.make_request_for_feature(search_url, self.code)
             resp = response
             data = json.loads(resp)
             if data:
@@ -338,11 +338,10 @@ class Area:
         if not self.image_path:
             return False
         image_xy_corners = []
+        img = cv2.imread(self.image_path, cv2.IMREAD_GRAYSCALE)
+        imagem = (255 - img)
 
         try:
-            img = cv2.imread(self.image_path, cv2.IMREAD_GRAYSCALE)
-            imagem = (255 - img)
-
             ret, thresh = cv2.threshold(imagem, 10, 128, cv2.THRESH_BINARY)
             try:
                 contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
